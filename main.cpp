@@ -23,8 +23,12 @@ struct A {
 int main()
 {
     MultiIndexMap<A, UniqueKey<A, int, &A::a>, NonUniqueKey<A, int, &A::b>> m;
-    m.add(1, 2);
-    m.add(2, 2);
+    auto ok = m.add(1, 2);
+    assert(ok);
+    ok = m.add(2, 2);
+    assert(ok);
+    ok = m.add(1, 3);
+    assert(!ok);
 
     m.del(A(1, 2));
 

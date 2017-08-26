@@ -13,13 +13,13 @@ struct KeyTraits {
     using Map = typename Key::template Map<Value>;
 
     template<typename Value>
-    static void add(Map<Value>& m, Value v) {
-        Key::add(m, v);
+    static bool add(Map<Value>& m, Value v) {
+        return Key::add(m, v);
     }
 
     template<typename Value>
-    static void del(Map<Value>& m, Value v) {
-        Key::del(m, v);
+    static bool del(Map<Value>& m, Value v) {
+        return Key::del(m, v);
     }
 };
 
@@ -27,6 +27,11 @@ struct KeyTraits {
 template<typename Key, typename Value>
 using KeyMap = typename KeyTraits<Key>::template Map<Value>;
 
+
+template<typename T>
+T *null() {
+    return static_cast<T *>(nullptr);
+}
 
 template<typename T, typename...Keys>
 class MultiIndexMap {
@@ -39,9 +44,15 @@ public:
     using MapTuple = std::tuple<Map<Keys>...>;
 
     template<typename...Args>
-    void add(Args&&...args) {
+    bool add(Args&&...args) {
         auto it = data_.emplace(data_.end(), std::forward<Args>(args)...);
-        addKeys(it);
+        if (addKey(it)) {
+            return true;
+        }
+
+        data_.erase(it);
+
+        return false;
     }
 
     bool del(const T& v) {
@@ -50,7 +61,7 @@ public:
             return false;
         }
 
-        delKeys(it);
+        delKey(it);
 
         data_.erase(it);
 
@@ -68,25 +79,38 @@ public:
     }
 
 private:
+    template<typename Key>
+    bool addKey(typename Container::iterator it, Key *) {
+        return KeyTraits<Key>::add(std::get<Map<Key>>(maps_), it);
+    }
+
+    template<typename Key, typename...LeftKeys>
+    bool addKey(typename Container::iterator it, Key *, LeftKeys *...) {
+        return addKey(it, null<Key>()) && addKey(it, null<LeftKeys>()...);
+    }
+
+    bool addKey(typename Container::iterator it) {
+        if (addKey(it, null<Keys>()...)) {
+            return true;
+        }
+
+        delKey(it);
+
+        return false;
+    }
 
     template<typename Key>
-    void addKey(typename Container::iterator it) {
-        KeyTraits<Key>::add(std::get<Map<Key>>(maps_), it);
+    size_t delKey(typename Container::iterator it, Key *) {
+        return KeyTraits<Key>::del(std::get<Map<Key>>(maps_), it);
     }
 
-    void addKeys(typename Container::iterator it) {
-        char dummy[] = { (addKey<Keys>(it), '0')... };
-        (void)dummy;
+    template<typename Key, typename...LeftKeys>
+    size_t delKey(typename Container::iterator it, Key *, LeftKeys*...) {
+        return delKey<Key>(it, null<Key>()) + delKey(it, null<LeftKeys>()...);
     }
 
-    template<typename Key>
-    void delKey(typename Container::iterator it) {
-        KeyTraits<Key>::del(std::get<Map<Key>>(maps_), it);
-    }
-
-    void delKeys(typename Container::iterator it) {
-        char dummy[] = { (delKey<Keys>(it), '0')... };
-        (void)dummy;
+    size_t delKey(typename Container::iterator it) {
+        return delKey(it, null<Keys>()...);
     }
 
     Container data_;
