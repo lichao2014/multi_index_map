@@ -46,7 +46,7 @@ public:
     template<typename...Args>
     bool add(Args&&...args) {
         auto it = data_.emplace(data_.end(), std::forward<Args>(args)...);
-        if (addKey(it)) {
+        if (addKeys(it)) {
             return true;
         }
 
@@ -61,7 +61,7 @@ public:
             return false;
         }
 
-        delKey(it);
+        delKeys(it);
 
         data_.erase(it);
 
@@ -78,38 +78,55 @@ public:
         return std::get<Map<Key>>(maps_);
     }
 
-private:
+    template<size_t I>
+    auto& get() const {
+        return std::get<I>(maps_);
+    }
+
     template<typename Key>
-    bool addKey(typename Container::iterator it, Key *) {
-        return KeyTraits<Key>::add(std::get<Map<Key>>(maps_), it);
+    auto& get() const {
+        return std::get<Map<Key>>(maps_);
+    }
+
+    bool size() const {
+        return data_.size();
+    }
+
+    bool empty() const {
+        return data_.size();
+    }
+
+private:
+    bool addKey(typename Container::iterator it) {
+        return true;
     }
 
     template<typename Key, typename...LeftKeys>
     bool addKey(typename Container::iterator it, Key *, LeftKeys *...) {
-        return addKey(it, null<Key>()) && addKey(it, null<LeftKeys>()...);
+        return KeyTraits<Key>::add(std::get<Map<Key>>(maps_), it)
+            && addKey(it, null<LeftKeys>()...);
     }
 
-    bool addKey(typename Container::iterator it) {
+    bool addKeys(typename Container::iterator it) {
         if (addKey(it, null<Keys>()...)) {
             return true;
         }
 
-        delKey(it);
-
+        delKeys(it);
         return false;
     }
 
-    template<typename Key>
-    size_t delKey(typename Container::iterator it, Key *) {
-        return KeyTraits<Key>::del(std::get<Map<Key>>(maps_), it);
+    size_t delKey(typename Container::iterator it) {
+        return 0;
     }
 
     template<typename Key, typename...LeftKeys>
     size_t delKey(typename Container::iterator it, Key *, LeftKeys*...) {
-        return delKey<Key>(it, null<Key>()) + delKey(it, null<LeftKeys>()...);
+        return KeyTraits<Key>::del(std::get<Map<Key>>(maps_), it)
+            + delKey(it, null<LeftKeys>()...);
     }
 
-    size_t delKey(typename Container::iterator it) {
+    size_t delKeys(typename Container::iterator it) {
         return delKey(it, null<Keys>()...);
     }
 
